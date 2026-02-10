@@ -1,0 +1,2156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weekly Load Map</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        :root {
+            --color-low: #E6F2FF;
+            --color-low-mid: #B3D9FF;
+            --color-mid: #66B266;
+            --color-mid-high: #FF9933;
+            --color-high: #CC3300;
+            --color-debt: rgba(140, 82, 255, 0.3);
+            --color-debt-shadow: rgba(140, 82, 255, 0.15);
+            --bg-light: #FAFAFA;
+            --bg-dark: #0A1929;
+            --text-light: #333333;
+            --text-dark: #E0E0E0;
+            --contour: rgba(136, 136, 136, 0.2);
+            --primary: #4a90e2;
+            --primary-dark: #357ae8;
+        }
+
+        body {
+            background: var(--bg-light);
+            color: var(--text-light);
+            min-height: 100vh;
+            transition: background 0.3s ease;
+        }
+
+        body.dark-mode {
+            background: var(--bg-dark);
+            color: var(--text-dark);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+
+        body.dark-mode header {
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 300;
+            margin-bottom: 10px;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 1.1rem;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        body.dark-mode .subtitle {
+            color: #aaa;
+        }
+
+        .app-container {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 30px;
+            min-height: 600px;
+        }
+
+        @media (max-width: 900px) {
+            .app-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Mode Selector */
+        .mode-selector {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            background: rgba(255,255,255,0.7);
+            padding: 10px;
+            border-radius: 10px;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+
+        body.dark-mode .mode-selector {
+            background: rgba(30, 30, 40, 0.7);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .mode-btn {
+            padding: 8px 20px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+        }
+
+        body.dark-mode .mode-btn {
+            background: #2a3a4a;
+            border-color: #444;
+            color: white;
+        }
+
+        .mode-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .mode-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        /* Energy Debt Toggle */
+        .debt-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 10px;
+            padding: 8px 15px;
+            background: rgba(255,255,255,0.7);
+            border-radius: 20px;
+            border: 1px solid rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        body.dark-mode .debt-toggle {
+            background: rgba(30, 30, 40, 0.7);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .debt-toggle.active {
+            background: rgba(140, 82, 255, 0.1);
+            border-color: rgba(140, 82, 255, 0.3);
+        }
+
+        .debt-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--color-debt);
+            box-shadow: 0 0 10px var(--color-debt);
+        }
+
+        .debt-toggle.active .debt-indicator {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.5; }
+            50% { opacity: 1; }
+            100% { opacity: 0.5; }
+        }
+
+        /* Comparison Mode Styles */
+        .comparison-container {
+            position: relative;
+            width: 100%;
+            height: 500px;
+            overflow: hidden;
+            border-radius: 15px;
+            border: 1px solid rgba(0,0,0,0.1);
+            background: var(--bg-light);
+        }
+
+        body.dark-mode .comparison-container {
+            background: var(--bg-dark);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .comparison-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .comparison-slider {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 100%;
+            background: rgba(255,255,255,0.8);
+            cursor: ew-resize;
+            z-index: 100;
+        }
+
+        .comparison-slider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            background: var(--primary);
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+
+        .comparison-label {
+            position: absolute;
+            top: 20px;
+            padding: 5px 15px;
+            background: rgba(255,255,255,0.9);
+            border-radius: 20px;
+            font-size: 0.9rem;
+            pointer-events: none;
+            border: 1px solid rgba(0,0,0,0.1);
+            z-index: 101;
+        }
+
+        .comparison-label.left {
+            left: 20px;
+        }
+
+        .comparison-label.right {
+            right: 20px;
+        }
+
+        body.dark-mode .comparison-label {
+            background: rgba(30, 30, 40, 0.9);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        /* Input Panel */
+        .input-panel {
+            background: rgba(255,255,255,0.7);
+            border-radius: 15px;
+            padding: 25px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+
+        body.dark-mode .input-panel {
+            background: rgba(30, 30, 40, 0.7);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .input-section {
+            margin-bottom: 30px;
+        }
+
+        h2 {
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            font-weight: 500;
+        }
+
+        h3 {
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            font-weight: 500;
+            color: var(--primary);
+        }
+
+        .activity-form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        input, select {
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            background: white;
+        }
+
+        body.dark-mode input,
+        body.dark-mode select {
+            background: #2a3a4a;
+            border-color: #444;
+            color: white;
+        }
+
+        .duration-buttons,
+        .load-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 8px 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+        }
+
+        body.dark-mode .btn {
+            background: #2a3a4a;
+            border-color: #444;
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .btn.active {
+            border-color: var(--primary);
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn.low { background: var(--color-low); }
+        .btn.medium { background: var(--color-mid); color: white; }
+        .btn.high { background: var(--color-high); color: white; }
+
+        .add-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.2s;
+        }
+
+        .add-btn:hover {
+            background: var(--primary-dark);
+        }
+
+        /* Activities List */
+        .activities-list {
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .activity-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.5);
+            border-left: 4px solid;
+            cursor: move;
+        }
+
+        body.dark-mode .activity-item {
+            background: rgba(255,255,255,0.05);
+        }
+
+        .activity-item.low { border-left-color: var(--color-low-mid); }
+        .activity-item.medium { border-left-color: var(--color-mid); }
+        .activity-item.high { border-left-color: var(--color-high); }
+
+        .delete-btn {
+            background: none;
+            border: none;
+            color: #ff4444;
+            cursor: pointer;
+            font-size: 1.2rem;
+            padding: 0 5px;
+        }
+
+        /* Visualization Panel */
+        .viz-panel {
+            position: relative;
+            border-radius: 15px;
+            overflow: hidden;
+            background: var(--bg-light);
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+
+        body.dark-mode .viz-panel {
+            background: var(--bg-dark);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        #loadMap {
+            width: 100%;
+            height: 500px;
+            display: block;
+        }
+
+        .map-controls {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            display: flex;
+            gap: 10px;
+            z-index: 100;
+        }
+
+        .control-btn {
+            background: rgba(255,255,255,0.9);
+            border: 1px solid rgba(0,0,0,0.1);
+            border-radius: 6px;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+
+        body.dark-mode .control-btn {
+            background: rgba(30, 30, 40, 0.9);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+        }
+
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255,255,255,0.9);
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 1px solid rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+
+        body.dark-mode .legend {
+            background: rgba(30, 30, 40, 0.9);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .legend-items {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+        }
+
+        .legend-label {
+            font-size: 0.9rem;
+        }
+
+        .info-panel {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255,255,255,0.95);
+            padding: 20px;
+            border-radius: 10px;
+            max-width: 300px;
+            text-align: center;
+            border: 1px solid rgba(0,0,0,0.1);
+            display: none;
+            z-index: 1000;
+        }
+
+        body.dark-mode .info-panel {
+            background: rgba(30, 30, 40, 0.95);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .close-info {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            cursor: pointer;
+            color: #666;
+        }
+
+        body.dark-mode .close-info {
+            color: #aaa;
+        }
+
+        /* Reflection Panel */
+        .reflection-panel {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.95);
+            padding: 20px;
+            border-radius: 10px;
+            max-width: 300px;
+            border: 1px solid rgba(0,0,0,0.1);
+            display: none;
+            z-index: 1000;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+
+        body.dark-mode .reflection-panel {
+            background: rgba(30, 30, 40, 0.95);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .reflection-content {
+            margin-bottom: 15px;
+        }
+
+        .reflection-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 10px;
+            background: rgba(74, 144, 226, 0.1);
+            border-radius: 6px;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: #666;
+        }
+
+        body.dark-mode .stat-label {
+            color: #aaa;
+        }
+
+        .reflection-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            width: 100%;
+            transition: background 0.2s;
+        }
+
+        .reflection-btn:hover {
+            background: var(--primary-dark);
+        }
+
+        /* Preset Weeks Panel */
+        .preset-panel {
+            background: rgba(255,255,255,0.7);
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+
+        body.dark-mode .preset-panel {
+            background: rgba(30, 30, 40, 0.7);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .preset-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .preset-btn {
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+            flex: 1;
+            min-width: 120px;
+        }
+
+        body.dark-mode .preset-btn {
+            background: #2a3a4a;
+            border-color: #444;
+            color: white;
+        }
+
+        .preset-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+
+        .preset-btn.exam-week {
+            background: linear-gradient(135deg, #ff9966, #ff5e62);
+            color: white;
+            border: none;
+        }
+
+        .preset-btn.normal-week {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+        }
+
+        .preset-btn.relaxed-week {
+            background: linear-gradient(135deg, #11998e, #38ef7d);
+            color: white;
+            border: none;
+        }
+
+        /* Debt Visualization Legend */
+        .debt-legend {
+            position: absolute;
+            bottom: 60px;
+            left: 20px;
+            background: rgba(255,255,255,0.9);
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 1px solid rgba(0,0,0,0.1);
+            display: none;
+            z-index: 100;
+        }
+
+        body.dark-mode .debt-legend {
+            background: rgba(30, 30, 40, 0.9);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .debt-legend.active {
+            display: block;
+        }
+
+        .debt-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 5px;
+        }
+
+        .debt-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--color-debt);
+        }
+
+        .debt-explanation {
+            position: absolute;
+            top: 60px;
+            left: 20px;
+            background: rgba(255,255,255,0.95);
+            padding: 15px;
+            border-radius: 10px;
+            max-width: 250px;
+            border: 1px solid rgba(0,0,0,0.1);
+            display: none;
+            z-index: 1000;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+
+        body.dark-mode .debt-explanation {
+            background: rgba(30, 30, 40, 0.95);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .debt-explanation.active {
+            display: block;
+        }
+
+        /* Comparison Controls */
+        .comparison-controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 101;
+        }
+
+        .comparison-controls .control-btn {
+            width: auto;
+            padding: 0 15px;
+            font-size: 0.9rem;
+            background: rgba(255,255,255,0.9);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        body.dark-mode .comparison-controls .control-btn {
+            background: rgba(30, 30, 40, 0.9);
+        }
+
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.9);
+            border: 1px solid rgba(0,0,0,0.1);
+            border-radius: 20px;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1.2rem;
+            z-index: 1000;
+        }
+
+        body.dark-mode .theme-toggle {
+            background: rgba(30, 30, 40, 0.9);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        /* Hidden elements */
+        .hidden {
+            display: none !important;
+        }
+
+        /* Week Selector for Comparison */
+        .week-selector {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            background: rgba(255,255,255,0.9);
+            padding: 10px 15px;
+            border-radius: 20px;
+            border: 1px solid rgba(0,0,0,0.1);
+            z-index: 101;
+        }
+
+        body.dark-mode .week-selector {
+            background: rgba(30, 30, 40, 0.9);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .week-select-btn {
+            padding: 5px 15px;
+            border: 1px solid #ddd;
+            border-radius: 15px;
+            background: white;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+        }
+
+        body.dark-mode .week-select-btn {
+            background: #2a3a4a;
+            border-color: #444;
+            color: white;
+        }
+
+        .week-select-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        /* Comparison Mode Instructions */
+        .comparison-instructions {
+            position: absolute;
+            top: 60px;
+            left: 20px;
+            background: rgba(255,255,255,0.95);
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 1px solid rgba(0,0,0,0.1);
+            font-size: 0.8rem;
+            max-width: 200px;
+            z-index: 101;
+        }
+
+        body.dark-mode .comparison-instructions {
+            background: rgba(30, 30, 40, 0.95);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Weekly Load Map</h1>
+            <p class="subtitle">Visualize your week as a topographic landscape of mental load</p>
+            <div class="debt-toggle" id="debtToggle">
+                <div class="debt-indicator"></div>
+                <span>Show Energy Debt Overlay</span>
+            </div>
+        </header>
+
+        <div class="mode-selector">
+            <button class="mode-btn active" data-mode="plan">Plan Week</button>
+            <button class="mode-btn" data-mode="compare">Compare Weeks</button>
+            <button class="mode-btn" data-mode="reflect">Week Reflection</button>
+        </div>
+
+        <div class="app-container">
+            <!-- Input Panel -->
+            <div class="input-panel" id="planPanel">
+                <div class="input-section">
+                    <h2>Add Activity</h2>
+                    <form id="activityForm" class="activity-form">
+                        <div class="form-group">
+                            <label for="activityName">Activity Name</label>
+                            <input type="text" id="activityName" placeholder="e.g., Math Exam, Study Session, Gym" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Duration</label>
+                            <div class="duration-buttons">
+                                <button type="button" class="btn" data-value="short">Short (30min)</button>
+                                <button type="button" class="btn active" data-value="medium">Medium (1-2h)</button>
+                                <button type="button" class="btn" data-value="long">Long (3+h)</button>
+                            </div>
+                            <input type="hidden" id="duration" value="medium">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Mental Load</label>
+                            <div class="load-buttons">
+                                <button type="button" class="btn low" data-value="low">Low</button>
+                                <button type="button" class="btn medium active" data-value="medium">Medium</button>
+                                <button type="button" class="btn high" data-value="high">High</button>
+                            </div>
+                            <input type="hidden" id="load" value="medium">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="day">Day</label>
+                            <select id="day">
+                                <option value="0">Monday</option>
+                                <option value="1">Tuesday</option>
+                                <option value="2">Wednesday</option>
+                                <option value="3">Thursday</option>
+                                <option value="4">Friday</option>
+                                <option value="5">Saturday</option>
+                                <option value="6">Sunday</option>
+                            </select>
+                        </div>
+                        
+                        <button type="submit" class="add-btn">Add to Week</button>
+                    </form>
+                </div>
+                
+                <div class="input-section">
+                    <h2>Your Activities</h2>
+                    <div id="activitiesList" class="activities-list">
+                        <!-- Activities will be added here -->
+                    </div>
+                </div>
+
+                <div class="preset-panel">
+                    <h3>Preset Weeks</h3>
+                    <div class="preset-buttons">
+                        <button class="preset-btn normal-week" id="presetNormal">Normal Week</button>
+                        <button class="preset-btn exam-week" id="presetExam">Exam Week</button>
+                        <button class="preset-btn relaxed-week" id="presetRelaxed">Relaxed Week</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Visualization Panel -->
+            <div class="viz-panel" id="vizPanel">
+                <canvas id="loadMap"></canvas>
+                
+                <div class="map-controls">
+                    <button class="control-btn" id="zoomIn">+</button>
+                    <button class="control-btn" id="zoomOut">-</button>
+                    <button class="control-btn" id="resetView">⟲</button>
+                    <button class="control-btn" id="showReflection">Notes</button>
+                    <button class="control-btn" id="showDebtInfo">Info</button>
+                </div>
+                
+                <div class="legend">
+                    <div class="legend-items">
+                        <div class="legend-color" style="background: var(--color-low);"></div>
+                        <span class="legend-label">Low Load</span>
+                        <div class="legend-color" style="background: var(--color-mid); margin-left: 10px;"></div>
+                        <span class="legend-label">Medium</span>
+                        <div class="legend-color" style="background: var(--color-high); margin-left: 10px;"></div>
+                        <span class="legend-label">High Load</span>
+                    </div>
+                </div>
+
+                <div class="debt-legend" id="debtLegend">
+                    <div class="debt-legend-item">
+                        <div class="debt-color"></div>
+                        <span class="legend-label">Energy Debt (recovery time)</span>
+                    </div>
+                </div>
+
+                <div class="debt-explanation" id="debtExplanation">
+                    <h3>Energy Debt</h3>
+                    <p>Activities don't disappear when they end — they leave a "fatigue shadow" that carries into future hours/days.</p>
+                    <p><strong>Longer shadow</strong> = higher load needs more recovery</p>
+                    <p><strong>Shadow overlaps</strong> = cumulative fatigue</p>
+                    <p>This shows why you might feel tired even when you're "done" with work.</p>
+                </div>
+                
+                <div id="infoPanel" class="info-panel">
+                    <button class="close-info">×</button>
+                    <h3 id="infoTitle"></h3>
+                    <p id="infoContent"></p>
+                </div>
+
+                <div id="reflectionPanel" class="reflection-panel">
+                    <div class="reflection-content">
+                        <h3>Week Reflection</h3>
+                        <p>What actually happened this week?</p>
+                        
+                        <div class="reflection-stats">
+                            <div class="stat-item">
+                                <div class="stat-value" id="peakLoad">0</div>
+                                <div class="stat-label">Peak Load</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value" id="valleys">0</div>
+                                <div class="stat-label">Natural Valleys</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value" id="crashZones">0</div>
+                                <div class="stat-label">Crash Zones</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value" id="balanceScore">0</div>
+                                <div class="stat-label">Balance Score</div>
+                            </div>
+                        </div>
+                        
+                        <div class="reflection-stats">
+                            <div class="stat-item">
+                                <div class="stat-value" id="energyDebt">0h</div>
+                                <div class="stat-label">Energy Debt</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value" id="recoveryTime">0h</div>
+                                <div class="stat-label">Recovery Needed</div>
+                            </div>
+                        </div>
+                        
+                        <p><em>How did your planned week compare to reality?</em></p>
+                    </div>
+                    <button class="reflection-btn" id="closeReflection">Close Reflection</button>
+                </div>
+            </div>
+
+            <!-- Comparison Panel -->
+            <div class="viz-panel hidden" id="comparePanel">
+                <div class="comparison-container">
+                    <canvas id="comparisonCanvas" class="comparison-canvas"></canvas>
+                    <div class="comparison-slider" id="comparisonSlider"></div>
+                    <div class="comparison-label left" id="leftLabel">Your Current Week</div>
+                    <div class="comparison-label right" id="rightLabel">Exam Week</div>
+                    
+                    <div class="comparison-controls">
+                        <button class="control-btn" id="swapWeeks">
+                            <span>Swap</span>
+                        </button>
+                        <button class="control-btn" id="autoFade">
+                            <span>Auto Fade</span>
+                        </button>
+                        <button class="control-btn" id="resetComparison">
+                            <span>Reset</span>
+                        </button>
+                    </div>
+
+                    <div class="week-selector">
+                        <button class="week-select-btn active" data-week="current">Current Week</button>
+                        <button class="week-select-btn" data-week="exam">Exam Week</button>
+                        <button class="week-select-btn" data-week="relaxed">Relaxed Week</button>
+                        <button class="week-select-btn" data-week="normal">Normal Week</button>
+                    </div>
+
+                    <div class="comparison-instructions">
+                        <strong>How to compare:</strong><br>
+                        • Drag slider left/right<br>
+                        • Click week buttons below<br>
+                        • Use Swap to exchange sides
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <button class="theme-toggle" id="themeToggle">🌙</button>
+
+    <script>
+        class WeeklyLoadMap {
+            constructor() {
+                this.activities = [];
+                this.currentWeek = [];
+                this.comparisonWeek = null;
+                this.selectedWeek = 'exam'; // Default comparison week
+                this.canvas = document.getElementById('loadMap');
+                this.comparisonCanvas = document.getElementById('comparisonCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.comparisonCtx = this.comparisonCanvas.getContext('2d');
+                this.zoom = 1;
+                this.offsetX = 0;
+                this.offsetY = 0;
+                this.isDragging = false;
+                this.lastX = 0;
+                this.lastY = 0;
+                this.hoveredPoint = null;
+                this.mode = 'plan';
+                this.comparisonSliderPos = 0.5;
+                this.isAutoFading = false;
+                this.fadeDirection = 1;
+                this.showEnergyDebt = false;
+                this.energyDebtData = [];
+                this.fadeInterval = null;
+                
+                // Create preset weeks for comparison
+                this.presetWeeks = {
+                    normal: [
+                        { name: "Math Class", duration: "medium", load: "medium", day: 0, position: 0.3 },
+                        { name: "Study Session", duration: "long", load: "high", day: 1, position: 0.5 },
+                        { name: "Gym", duration: "short", load: "low", day: 2, position: 0.7 },
+                        { name: "Group Project", duration: "medium", load: "medium", day: 3, position: 0.4 },
+                        { name: "Reading", duration: "short", load: "low", day: 4, position: 0.6 }
+                    ],
+                    exam: [
+                        { name: "Math Final", duration: "long", load: "high", day: 0, position: 0.3 },
+                        { name: "Physics Exam", duration: "long", load: "high", day: 1, position: 0.4 },
+                        { name: "Study Marathon", duration: "long", load: "high", day: 2, position: 0.5 },
+                        { name: "Chemistry Test", duration: "long", load: "high", day: 2, position: 0.8 },
+                        { name: "History Paper Due", duration: "long", load: "medium", day: 3, position: 0.6 },
+                        { name: "Lab Report", duration: "medium", load: "medium", day: 4, position: 0.4 },
+                        { name: "Quick Review", duration: "short", load: "low", day: 5, position: 0.7 }
+                    ],
+                    relaxed: [
+                        { name: "Morning Walk", duration: "short", load: "low", day: 0, position: 0.2 },
+                        { name: "Reading", duration: "medium", load: "low", day: 1, position: 0.5 },
+                        { name: "Gym", duration: "medium", load: "low", day: 2, position: 0.7 },
+                        { name: "Creative Project", duration: "long", load: "medium", day: 3, position: 0.4 },
+                        { name: "Movie Night", duration: "short", load: "low", day: 4, position: 0.8 }
+                    ]
+                };
+                
+                this.init();
+            }
+            
+            init() {
+                this.setupCanvas();
+                this.setupEventListeners();
+                this.setupDefaultActivities();
+                this.updateComparisonWeek();
+                this.calculateEnergyDebt();
+                this.updateActivitiesList();
+                this.draw();
+            }
+            
+            setupCanvas() {
+                const updateCanvasSize = () => {
+                    this.canvas.width = this.canvas.offsetWidth;
+                    this.canvas.height = this.canvas.offsetHeight;
+                    
+                    this.comparisonCanvas.width = this.comparisonCanvas.offsetWidth;
+                    this.comparisonCanvas.height = this.comparisonCanvas.offsetHeight;
+                    
+                    if (this.mode === 'plan') {
+                        this.draw();
+                    } else if (this.mode === 'compare') {
+                        this.drawComparison();
+                    }
+                };
+                
+                updateCanvasSize();
+                window.addEventListener('resize', updateCanvasSize);
+            }
+            
+            setupEventListeners() {
+                // Canvas interactions
+                this.canvas.addEventListener('mousedown', (e) => this.startDrag(e));
+                this.canvas.addEventListener('mousemove', (e) => this.drag(e));
+                this.canvas.addEventListener('mouseup', () => this.stopDrag());
+                this.canvas.addEventListener('wheel', (e) => this.handleZoom(e));
+                this.canvas.addEventListener('click', (e) => this.handleClick(e));
+                
+                // Comparison canvas interactions
+                this.comparisonCanvas.addEventListener('mousedown', (e) => this.startComparisonDrag(e));
+                document.addEventListener('mousemove', (e) => this.comparisonDrag(e));
+                document.addEventListener('mouseup', () => this.stopComparisonDrag());
+                
+                // Control buttons
+                document.getElementById('zoomIn').addEventListener('click', () => {
+                    this.zoom *= 1.2;
+                    this.draw();
+                });
+                
+                document.getElementById('zoomOut').addEventListener('click', () => {
+                    this.zoom /= 1.2;
+                    this.draw();
+                });
+                
+                document.getElementById('resetView').addEventListener('click', () => {
+                    this.zoom = 1;
+                    this.offsetX = 0;
+                    this.offsetY = 0;
+                    this.draw();
+                });
+                
+                document.getElementById('showReflection').addEventListener('click', () => {
+                    this.showReflection();
+                });
+                
+                document.getElementById('showDebtInfo').addEventListener('click', () => {
+                    const explanation = document.getElementById('debtExplanation');
+                    explanation.classList.toggle('active');
+                    
+                    setTimeout(() => {
+                        explanation.classList.remove('active');
+                    }, 5000);
+                });
+                
+                document.getElementById('closeReflection').addEventListener('click', () => {
+                    document.getElementById('reflectionPanel').style.display = 'none';
+                });
+                
+                // Energy Debt Toggle
+                document.getElementById('debtToggle').addEventListener('click', () => {
+                    this.showEnergyDebt = !this.showEnergyDebt;
+                    document.getElementById('debtToggle').classList.toggle('active');
+                    document.getElementById('debtLegend').classList.toggle('active');
+                    
+                    if (this.mode === 'plan') {
+                        this.draw();
+                    } else if (this.mode === 'compare') {
+                        this.drawComparison();
+                    }
+                });
+                
+                // Close info panel
+                document.querySelector('.close-info').addEventListener('click', () => {
+                    document.getElementById('infoPanel').style.display = 'none';
+                });
+                
+                // Mode switching
+                document.querySelectorAll('.mode-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        
+                        this.mode = btn.dataset.mode;
+                        this.switchMode(this.mode);
+                    });
+                });
+                
+                // Comparison controls
+                document.getElementById('swapWeeks').addEventListener('click', () => {
+                    this.swapComparison();
+                });
+                
+                document.getElementById('autoFade').addEventListener('click', () => {
+                    this.toggleAutoFade();
+                });
+                
+                document.getElementById('resetComparison').addEventListener('click', () => {
+                    this.comparisonSliderPos = 0.5;
+                    this.drawComparison();
+                });
+                
+                // Week selection for comparison
+                document.querySelectorAll('.week-select-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        document.querySelectorAll('.week-select-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        
+                        this.selectedWeek = btn.dataset.week;
+                        this.updateComparisonWeek();
+                        this.drawComparison();
+                    });
+                });
+                
+                // Preset buttons
+                document.getElementById('presetNormal').addEventListener('click', () => {
+                    this.loadPreset('normal');
+                    this.updateComparisonWeek();
+                    if (this.mode === 'compare') {
+                        this.drawComparison();
+                    }
+                });
+                
+                document.getElementById('presetExam').addEventListener('click', () => {
+                    this.loadPreset('exam');
+                    this.updateComparisonWeek();
+                    if (this.mode === 'compare') {
+                        this.drawComparison();
+                    }
+                });
+                
+                document.getElementById('presetRelaxed').addEventListener('click', () => {
+                    this.loadPreset('relaxed');
+                    this.updateComparisonWeek();
+                    if (this.mode === 'compare') {
+                        this.drawComparison();
+                    }
+                });
+            }
+            
+            updateComparisonWeek() {
+                // Handle special case for 'current' week
+                if (this.selectedWeek === 'current') {
+                    this.comparisonWeek = [...this.activities];
+                } else {
+                    // Ensure selectedWeek exists in presetWeeks
+                    if (!this.presetWeeks || !this.presetWeeks[this.selectedWeek]) {
+                        this.selectedWeek = 'exam'; // fallback to default
+                    }
+                    
+                    this.comparisonWeek = [...this.presetWeeks[this.selectedWeek]];
+                }
+                
+                // Update labels
+                const leftLabel = document.getElementById('leftLabel');
+                const rightLabel = document.getElementById('rightLabel');
+                
+                if (leftLabel) leftLabel.textContent = 'Your Current Week';
+                if (rightLabel) rightLabel.textContent = this.getWeekName(this.selectedWeek);
+            }
+            
+            getWeekName(weekKey) {
+                const names = {
+                    'normal': 'Normal Week',
+                    'exam': 'Exam Week',
+                    'relaxed': 'Relaxed Week',
+                    'current': 'Current Week'
+                };
+                return names[weekKey] || weekKey;
+            }
+            
+            swapComparison() {
+                // Ensure we have valid data before swapping
+                if (!this.comparisonWeek || !Array.isArray(this.comparisonWeek)) {
+                    console.warn('Cannot swap: comparison week is not valid');
+                    return;
+                }
+                
+                // Swap current activities with comparison week
+                const temp = [...this.activities];
+                this.activities = [...this.comparisonWeek];
+                this.comparisonWeek = temp;
+                
+                // Update UI
+                this.currentWeek = [...this.activities];
+                this.calculateEnergyDebt();
+                this.updateActivitiesList();
+                
+                // Update labels
+                document.getElementById('leftLabel').textContent = 'Your Current Week';
+                document.getElementById('rightLabel').textContent = this.getWeekName(this.selectedWeek);
+                
+                this.drawComparison();
+            }
+            
+            toggleAutoFade() {
+                this.isAutoFading = !this.isAutoFading;
+                const autoFadeBtn = document.getElementById('autoFade');
+                
+                if (this.isAutoFading) {
+                    autoFadeBtn.style.background = 'rgba(74, 144, 226, 0.9)';
+                    autoFadeBtn.style.color = 'white';
+                    this.startAutoFade();
+                } else {
+                    autoFadeBtn.style.background = '';
+                    autoFadeBtn.style.color = '';
+                    this.stopAutoFade();
+                }
+            }
+            
+            startAutoFade() {
+                if (this.fadeInterval) {
+                    clearInterval(this.fadeInterval);
+                }
+                
+                this.fadeInterval = setInterval(() => {
+                    this.comparisonSliderPos += 0.01 * this.fadeDirection;
+                    
+                    if (this.comparisonSliderPos >= 0.9) {
+                        this.fadeDirection = -1;
+                    } else if (this.comparisonSliderPos <= 0.1) {
+                        this.fadeDirection = 1;
+                    }
+                    
+                    this.drawComparison();
+                }, 50);
+            }
+            
+            stopAutoFade() {
+                if (this.fadeInterval) {
+                    clearInterval(this.fadeInterval);
+                    this.fadeInterval = null;
+                }
+            }
+            
+            switchMode(mode) {
+                const vizPanel = document.getElementById('vizPanel');
+                const comparePanel = document.getElementById('comparePanel');
+                const planPanel = document.getElementById('planPanel');
+                
+                switch(mode) {
+                    case 'plan':
+                        vizPanel.classList.remove('hidden');
+                        comparePanel.classList.add('hidden');
+                        planPanel.style.display = 'block';
+                        this.draw();
+                        break;
+                        
+                    case 'compare':
+                        vizPanel.classList.add('hidden');
+                        comparePanel.classList.remove('hidden');
+                        planPanel.style.display = 'none';
+                        this.updateComparisonWeek();
+                        // Ensure canvas is sized properly before drawing
+                        setTimeout(() => {
+                            this.comparisonCanvas.width = this.comparisonCanvas.offsetWidth;
+                            this.comparisonCanvas.height = this.comparisonCanvas.offsetHeight;
+                            this.drawComparison();
+                        }, 10);
+                        break;
+                        
+                    case 'reflect':
+                        vizPanel.classList.remove('hidden');
+                        comparePanel.classList.add('hidden');
+                        planPanel.style.display = 'block';
+                        this.showReflection();
+                        this.draw();
+                        break;
+                }
+            }
+            
+            setupDefaultActivities() {
+                // Add some example activities
+                this.addActivity({
+                    name: "Math Class",
+                    duration: "medium",
+                    load: "medium",
+                    day: 0,
+                    position: 0.3
+                });
+                
+                this.addActivity({
+                    name: "Study Session",
+                    duration: "long",
+                    load: "high",
+                    day: 1,
+                    position: 0.5
+                });
+                
+                this.addActivity({
+                    name: "Gym",
+                    duration: "short",
+                    load: "low",
+                    day: 2,
+                    position: 0.7
+                });
+                
+                this.addActivity({
+                    name: "Group Project",
+                    duration: "medium",
+                    load: "medium",
+                    day: 3,
+                    position: 0.4
+                });
+                
+                this.addActivity({
+                    name: "Reading",
+                    duration: "short",
+                    load: "low",
+                    day: 4,
+                    position: 0.6
+                });
+            }
+            
+            addActivity(activity) {
+                if (!activity.position) {
+                    activity.position = Math.random();
+                }
+                this.activities.push(activity);
+                this.currentWeek = [...this.activities];
+                this.calculateEnergyDebt();
+                
+                if (this.mode === 'plan') {
+                    this.draw();
+                } else if (this.mode === 'compare') {
+                    this.drawComparison();
+                }
+                
+                this.updateActivitiesList();
+            }
+            
+            removeActivity(index) {
+                this.activities.splice(index, 1);
+                this.currentWeek = [...this.activities];
+                this.calculateEnergyDebt();
+                
+                if (this.mode === 'plan') {
+                    this.draw();
+                } else if (this.mode === 'compare') {
+                    this.drawComparison();
+                }
+                
+                this.updateActivitiesList();
+            }
+            
+            updateActivitiesList() {
+                const list = document.getElementById('activitiesList');
+                list.innerHTML = '';
+                
+                this.activities.forEach((activity, index) => {
+                    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                    const durationLabels = {
+                        'short': '30min',
+                        'medium': '1-2h',
+                        'long': '3+h'
+                    };
+                    
+                    const item = document.createElement('div');
+                    item.className = `activity-item ${activity.load}`;
+                    item.innerHTML = `
+                        <div>
+                            <strong>${activity.name}</strong><br>
+                            <small>${dayNames[activity.day]} • ${durationLabels[activity.duration]} • ${activity.load} load</small>
+                        </div>
+                        <button class="delete-btn" data-index="${index}">×</button>
+                    `;
+                    
+                    item.querySelector('.delete-btn').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.removeActivity(index);
+                    });
+                    
+                    list.appendChild(item);
+                });
+            }
+            
+            loadPreset(type) {
+                this.activities = [...this.presetWeeks[type]];
+                this.currentWeek = [...this.activities];
+                this.calculateEnergyDebt();
+                
+                if (this.mode === 'plan') {
+                    this.draw();
+                } else if (this.mode === 'compare') {
+                    this.drawComparison();
+                }
+                
+                this.updateActivitiesList();
+            }
+            
+            getLoadValue(load) {
+                const values = { low: 0.2, medium: 0.5, high: 0.8 };
+                return values[load] || 0.5;
+            }
+            
+            getDurationWidth(duration) {
+                const widths = { short: 0.1, medium: 0.15, long: 0.25 };
+                return widths[duration] || 0.15;
+            }
+            
+            generateTerrain(activities, isForComparison = false) {
+                const canvas = isForComparison ? this.comparisonCanvas : this.canvas;
+                const width = canvas.width;
+                const height = canvas.height;
+                const terrain = new Array(width).fill(0);
+                
+                // Create base terrain with gentle hills
+                for (let x = 0; x < width; x++) {
+                    const day = (x / width) * 7;
+                    terrain[x] = Math.sin(day * 0.8) * 0.1 + Math.sin(day * 2.3) * 0.05;
+                }
+                
+                // Add activities as Gaussian peaks
+                activities.forEach(activity => {
+                    const load = this.getLoadValue(activity.load);
+                    const duration = this.getDurationWidth(activity.duration);
+                    const centerX = (activity.day + activity.position) / 7 * width;
+                    const sigma = duration * width * 0.5;
+                    
+                    for (let x = 0; x < width; x++) {
+                        const dx = (x - centerX) / sigma;
+                        const contribution = load * Math.exp(-dx * dx / 2);
+                        terrain[x] += contribution;
+                    }
+                });
+                
+                // Smooth the terrain
+                const smoothed = [...terrain];
+                for (let i = 2; i < width - 2; i++) {
+                    smoothed[i] = (
+                        terrain[i-2] * 0.1 +
+                        terrain[i-1] * 0.2 +
+                        terrain[i] * 0.4 +
+                        terrain[i+1] * 0.2 +
+                        terrain[i+2] * 0.1
+                    );
+                }
+                
+                return smoothed;
+            }
+            
+            calculateEnergyDebt() {
+                this.energyDebtData = [];
+                const width = this.canvas.width;
+                
+                this.activities.forEach(activity => {
+                    const load = this.getLoadValue(activity.load);
+                    const duration = this.getDurationWidth(activity.duration);
+                    const centerX = (activity.day + activity.position) / 7 * width;
+                    
+                    const recoveryMultiplier = {
+                        'low': 0.5,
+                        'medium': 1.5,
+                        'high': 3.0
+                    }[activity.load] || 1.0;
+                    
+                    const shadowLength = duration * width * recoveryMultiplier;
+                    const shadowStart = centerX;
+                    const shadowEnd = centerX + shadowLength;
+                    
+                    this.energyDebtData.push({
+                        activity: activity,
+                        start: shadowStart,
+                        end: shadowEnd,
+                        maxIntensity: load * 0.6
+                    });
+                });
+                
+                this.energyDebtData.sort((a, b) => a.start - b.start);
+            }
+            
+            draw() {
+                const width = this.canvas.width;
+                const height = this.canvas.height;
+                const ctx = this.ctx;
+                
+                // Clear canvas
+                ctx.clearRect(0, 0, width, height);
+                
+                // Apply zoom and pan
+                ctx.save();
+                ctx.translate(this.offsetX, this.offsetY);
+                ctx.scale(this.zoom, this.zoom);
+                
+                // Generate terrain
+                const terrain = this.generateTerrain(this.activities, false);
+                const baseline = height * 0.7;
+                
+                // Draw gradient background
+                const gradient = ctx.createLinearGradient(0, 0, width, 0);
+                gradient.addColorStop(0, '#f0f8ff');
+                gradient.addColorStop(1, '#f8f8f8');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, width, height);
+                
+                // Draw terrain fill
+                ctx.beginPath();
+                ctx.moveTo(0, baseline);
+                
+                for (let x = 0; x < width; x++) {
+                    const y = baseline - terrain[x] * height * 0.4;
+                    ctx.lineTo(x, y);
+                }
+                
+                ctx.lineTo(width, baseline);
+                ctx.lineTo(0, baseline);
+                ctx.closePath();
+                
+                // Create terrain gradient
+                const terrainGradient = ctx.createLinearGradient(0, baseline, 0, 0);
+                terrainGradient.addColorStop(0, 'rgba(102, 178, 102, 0.3)');
+                terrainGradient.addColorStop(0.3, 'rgba(255, 153, 51, 0.4)');
+                terrainGradient.addColorStop(1, 'rgba(204, 51, 0, 0.5)');
+                
+                ctx.fillStyle = terrainGradient;
+                ctx.fill();
+                
+                // Draw energy debt shadows if enabled
+                if (this.showEnergyDebt) {
+                    this.drawEnergyDebtShadows(ctx, width, height, baseline);
+                }
+                
+                // Draw contour lines
+                ctx.strokeStyle = 'rgba(136, 136, 136, 0.2)';
+                ctx.lineWidth = 1;
+                
+                for (let level = 0.1; level < 1; level += 0.1) {
+                    ctx.beginPath();
+                    let inLine = false;
+                    
+                    for (let x = 0; x < width; x++) {
+                        const y = baseline - terrain[x] * height * 0.4;
+                        
+                        if (terrain[x] >= level) {
+                            if (!inLine) {
+                                ctx.moveTo(x, y);
+                                inLine = true;
+                            }
+                            ctx.lineTo(x, y);
+                        } else {
+                            inLine = false;
+                        }
+                    }
+                    
+                    ctx.stroke();
+                }
+                
+                // Draw day separators
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+                ctx.lineWidth = 1;
+                
+                for (let day = 1; day < 7; day++) {
+                    const x = (day / 7) * width;
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, height);
+                    ctx.stroke();
+                }
+                
+                // Draw activity markers
+                this.activities.forEach(activity => {
+                    const x = (activity.day + activity.position) / 7 * width;
+                    const load = this.getLoadValue(activity.load);
+                    const y = baseline - terrain[Math.floor(x)] * height * 0.4;
+                    
+                    // Draw marker
+                    ctx.beginPath();
+                    ctx.arc(x, y, 8, 0, Math.PI * 2);
+                    
+                    // Color based on load
+                    if (load < 0.4) {
+                        ctx.fillStyle = '#4a90e2';
+                    } else if (load < 0.7) {
+                        ctx.fillStyle = '#ff9933';
+                    } else {
+                        ctx.fillStyle = '#cc3300';
+                    }
+                    
+                    ctx.fill();
+                    ctx.strokeStyle = 'white';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                });
+                
+                ctx.restore();
+            }
+            
+            drawComparison() {
+                const width = this.comparisonCanvas.width;
+                const height = this.comparisonCanvas.height;
+                const ctx = this.comparisonCtx;
+                
+                if (!ctx || width === 0 || height === 0) return;
+                
+                // Ensure we have valid comparison data
+                if (!this.comparisonWeek || !Array.isArray(this.comparisonWeek)) {
+                    this.updateComparisonWeek();
+                    if (!this.comparisonWeek) return; // Still no data, bail out
+                }
+                
+                // Clear canvas
+                ctx.clearRect(0, 0, width, height);
+                
+                // Generate terrains for both weeks
+                const terrain1 = this.generateTerrain(this.activities || [], true);
+                const terrain2 = this.generateTerrain(this.comparisonWeek, true);
+                const baseline = height * 0.7;
+                
+                // Calculate slider position
+                const sliderX = this.comparisonSliderPos * width;
+                
+                // Draw left side (current week)
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(0, 0, sliderX, height);
+                ctx.clip();
+                
+                // Draw left terrain
+                this.drawComparisonTerrain(ctx, terrain1, width, height, baseline, 0, sliderX, false);
+                ctx.restore();
+                
+                // Draw right side (comparison week)
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(sliderX, 0, width - sliderX, height);
+                ctx.clip();
+                
+                // Draw right terrain with different color scheme
+                this.drawComparisonTerrain(ctx, terrain2, width, height, baseline, sliderX, width, true);
+                ctx.restore();
+                
+                // Draw day separators (on top of everything)
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+                ctx.lineWidth = 1;
+                
+                for (let day = 1; day < 7; day++) {
+                    const x = (day / 7) * width;
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, height);
+                    ctx.stroke();
+                }
+                
+                // Update slider position
+                const slider = document.getElementById('comparisonSlider');
+                if (slider) {
+                    slider.style.left = `${sliderX - 2}px`;
+                }
+            }
+            
+            drawComparisonTerrain(ctx, terrain, width, height, baseline, startX, endX, isRightSide = false) {
+                // Draw gradient background
+                const gradient = ctx.createLinearGradient(0, 0, width, 0);
+                gradient.addColorStop(0, '#f0f8ff');
+                gradient.addColorStop(1, '#f8f8f8');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(startX, 0, endX - startX, height);
+                
+                // Draw terrain fill
+                ctx.beginPath();
+                ctx.moveTo(startX, baseline);
+                
+                for (let x = startX; x < endX; x++) {
+                    const y = baseline - terrain[x] * height * 0.4;
+                    ctx.lineTo(x, y);
+                }
+                
+                ctx.lineTo(endX, baseline);
+                ctx.lineTo(startX, baseline);
+                ctx.closePath();
+                
+                // Create terrain gradient (different colors for each side)
+                const terrainGradient = ctx.createLinearGradient(0, baseline, 0, 0);
+                if (!isRightSide) {
+                    // Left side - blue/green scheme
+                    terrainGradient.addColorStop(0, 'rgba(102, 178, 102, 0.4)');
+                    terrainGradient.addColorStop(0.3, 'rgba(255, 153, 51, 0.5)');
+                    terrainGradient.addColorStop(1, 'rgba(204, 51, 0, 0.6)');
+                } else {
+                    // Right side - purple/orange scheme
+                    terrainGradient.addColorStop(0, 'rgba(74, 144, 226, 0.4)');
+                    terrainGradient.addColorStop(0.3, 'rgba(155, 89, 182, 0.5)');
+                    terrainGradient.addColorStop(1, 'rgba(231, 76, 60, 0.6)');
+                }
+                
+                ctx.fillStyle = terrainGradient;
+                ctx.fill();
+                
+                // Draw contour lines
+                ctx.strokeStyle = 'rgba(136, 136, 136, 0.3)';
+                ctx.lineWidth = 1;
+                
+                for (let level = 0.1; level < 1; level += 0.1) {
+                    ctx.beginPath();
+                    let inLine = false;
+                    
+                    for (let x = startX; x < endX; x++) {
+                        const y = baseline - terrain[x] * height * 0.4;
+                        
+                        if (terrain[x] >= level) {
+                            if (!inLine) {
+                                ctx.moveTo(x, y);
+                                inLine = true;
+                            }
+                            ctx.lineTo(x, y);
+                        } else {
+                            inLine = false;
+                        }
+                    }
+                    
+                    ctx.stroke();
+                }
+            }
+            
+            drawEnergyDebtShadows(ctx, width, height, baseline) {
+                this.energyDebtData.forEach(shadow => {
+                    const startX = Math.max(0, shadow.start);
+                    const endX = Math.min(width, shadow.end);
+                    
+                    if (startX >= endX) return;
+                    
+                    const shadowGradient = ctx.createLinearGradient(startX, 0, endX, 0);
+                    shadowGradient.addColorStop(0, 'rgba(140, 82, 255, 0.4)');
+                    shadowGradient.addColorStop(1, 'rgba(140, 82, 255, 0)');
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(startX, baseline);
+                    
+                    for (let x = startX; x < endX; x++) {
+                        const progress = (x - startX) / (endX - startX);
+                        const intensity = shadow.maxIntensity * (1 - progress);
+                        const y = baseline - intensity * height * 0.3;
+                        ctx.lineTo(x, y);
+                    }
+                    
+                    ctx.lineTo(endX, baseline);
+                    ctx.lineTo(startX, baseline);
+                    ctx.closePath();
+                    
+                    ctx.fillStyle = shadowGradient;
+                    ctx.fill();
+                });
+            }
+            
+            startComparisonDrag(e) {
+                if (e.target !== this.comparisonCanvas && !e.target.closest('.comparison-slider')) return;
+                
+                this.isDragging = true;
+                const rect = this.comparisonCanvas.getBoundingClientRect();
+                this.lastX = e.clientX - rect.left;
+                this.updateSliderPosition(this.lastX);
+            }
+            
+            comparisonDrag(e) {
+                if (!this.isDragging) return;
+                
+                const rect = this.comparisonCanvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                this.updateSliderPosition(x);
+            }
+            
+            stopComparisonDrag() {
+                this.isDragging = false;
+            }
+            
+            updateSliderPosition(x) {
+                const width = this.comparisonCanvas.width;
+                this.comparisonSliderPos = Math.max(0.1, Math.min(0.9, x / width));
+                this.drawComparison();
+            }
+            
+            showReflection() {
+                const terrain = this.generateTerrain(this.activities, false);
+                
+                // Calculate reflection stats
+                const peakLoad = Math.max(...terrain).toFixed(2);
+                const valleys = terrain.filter(v => v < 0.3).length;
+                const crashZones = this.countCrashZones(terrain);
+                const balanceScore = this.calculateBalanceScore(terrain);
+                
+                // Calculate energy debt stats
+                const totalDebtHours = this.calculateTotalDebtHours();
+                const recoveryHours = this.calculateRecoveryTime();
+                
+                // Update reflection panel
+                document.getElementById('peakLoad').textContent = peakLoad;
+                document.getElementById('valleys').textContent = valleys;
+                document.getElementById('crashZones').textContent = crashZones;
+                document.getElementById('balanceScore').textContent = balanceScore;
+                document.getElementById('energyDebt').textContent = `${totalDebtHours}h`;
+                document.getElementById('recoveryTime').textContent = `${recoveryHours}h`;
+                
+                document.getElementById('reflectionPanel').style.display = 'block';
+            }
+            
+            calculateTotalDebtHours() {
+                let totalHours = 0;
+                
+                this.energyDebtData.forEach(shadow => {
+                    const width = this.canvas.width;
+                    const shadowWidth = shadow.end - shadow.start;
+                    const hoursPerPixel = 168 / width;
+                    totalHours += shadowWidth * hoursPerPixel * 0.5;
+                });
+                
+                return Math.round(totalHours);
+            }
+            
+            calculateRecoveryTime() {
+                let recoveryTime = 0;
+                
+                this.activities.forEach(activity => {
+                    const durationHours = {
+                        'short': 0.5,
+                        'medium': 1.5,
+                        'long': 3
+                    }[activity.duration] || 1;
+                    
+                    const recoveryMultiplier = {
+                        'low': 0.5,
+                        'medium': 1.5,
+                        'high': 3.0
+                    }[activity.load] || 1.0;
+                    
+                    recoveryTime += durationHours * recoveryMultiplier;
+                });
+                
+                return Math.round(recoveryTime);
+            }
+            
+            countCrashZones(terrain) {
+                const crashThreshold = 0.7;
+                let crashZones = 0;
+                let inCrashZone = false;
+                
+                for (let i = 0; i < terrain.length; i++) {
+                    if (terrain[i] > crashThreshold && !inCrashZone) {
+                        inCrashZone = true;
+                        crashZones++;
+                    } else if (terrain[i] <= crashThreshold) {
+                        inCrashZone = false;
+                    }
+                }
+                
+                return crashZones;
+            }
+            
+            calculateBalanceScore(terrain) {
+                const mean = terrain.reduce((a, b) => a + b, 0) / terrain.length;
+                const variance = terrain.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / terrain.length;
+                const score = Math.max(0, 100 - Math.sqrt(variance) * 100);
+                return Math.round(score);
+            }
+            
+            startDrag(e) {
+                this.isDragging = true;
+                this.lastX = e.clientX;
+                this.lastY = e.clientY;
+                this.canvas.style.cursor = 'grabbing';
+            }
+            
+            drag(e) {
+                if (!this.isDragging) return;
+                
+                const dx = e.clientX - this.lastX;
+                const dy = e.clientY - this.lastY;
+                
+                this.offsetX += dx;
+                this.offsetY += dy;
+                
+                this.lastX = e.clientX;
+                this.lastY = e.clientY;
+                
+                this.draw();
+            }
+            
+            stopDrag() {
+                this.isDragging = false;
+                this.canvas.style.cursor = 'default';
+            }
+            
+            handleZoom(e) {
+                e.preventDefault();
+                
+                const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+                const mouseX = e.clientX - this.canvas.getBoundingClientRect().left;
+                const mouseY = e.clientY - this.canvas.getBoundingClientRect().top;
+                
+                const worldX = (mouseX - this.offsetX) / this.zoom;
+                const worldY = (mouseY - this.offsetY) / this.zoom;
+                
+                this.zoom *= zoomFactor;
+                this.zoom = Math.max(0.5, Math.min(3, this.zoom));
+                
+                this.offsetX = mouseX - worldX * this.zoom;
+                this.offsetY = mouseY - worldY * this.zoom;
+                
+                this.draw();
+            }
+            
+            handleClick(e) {
+                if (this.mode !== 'plan') return;
+                
+                const rect = this.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                const canvasX = (x - this.offsetX) / this.zoom;
+                const canvasY = (y - this.offsetY) / this.zoom;
+                
+                const width = this.canvas.width;
+                const height = this.canvas.height;
+                const terrain = this.generateTerrain(this.activities, false);
+                const baseline = height * 0.7;
+                
+                let closestActivity = null;
+                let minDistance = Infinity;
+                
+                this.activities.forEach(activity => {
+                    const activityX = (activity.day + activity.position) / 7 * width;
+                    const activityY = baseline - terrain[Math.floor(activityX)] * height * 0.4;
+                    
+                    const distance = Math.sqrt(
+                        Math.pow(canvasX - activityX, 2) + 
+                        Math.pow(canvasY - activityY, 2)
+                    );
+                    
+                    if (distance < 20 && distance < minDistance) {
+                        minDistance = distance;
+                        closestActivity = activity;
+                    }
+                });
+                
+                if (closestActivity) {
+                    const durationLabels = {
+                        'short': 'Short (30min)',
+                        'medium': 'Medium (1-2 hours)',
+                        'long': 'Long (3+ hours)'
+                    };
+                    
+                    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                    
+                    const recoveryMultiplier = {
+                        'low': 0.5,
+                        'medium': 1.5,
+                        'high': 3.0
+                    }[closestActivity.load] || 1.0;
+                    
+                    const recoveryTime = {
+                        'short': 0.5 * recoveryMultiplier,
+                        'medium': 1.5 * recoveryMultiplier,
+                        'long': 3 * recoveryMultiplier
+                    }[closestActivity.duration];
+                    
+                    document.getElementById('infoTitle').textContent = closestActivity.name;
+                    document.getElementById('infoContent').innerHTML = `
+                        <strong>Load Level:</strong> ${closestActivity.load.toUpperCase()}<br>
+                        <strong>Duration:</strong> ${durationLabels[closestActivity.duration]}<br>
+                        <strong>Day:</strong> ${dayNames[closestActivity.day]}<br>
+                        <strong>Recovery time:</strong> ~${recoveryTime.toFixed(1)} hours<br>
+                        <em>Click elsewhere to close</em>
+                    `;
+                    
+                    document.getElementById('infoPanel').style.display = 'block';
+                } else {
+                    const terrainValue = terrain[Math.floor(canvasX)];
+                    if (terrainValue < 0.3) {
+                        const day = Math.floor((canvasX / width) * 7);
+                        const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                        
+                        const debtIntensity = this.getDebtIntensityAt(canvasX);
+                        
+                        if (debtIntensity > 0.3) {
+                            document.getElementById('infoTitle').textContent = 'Fatigued Valley';
+                            document.getElementById('infoContent').innerHTML = `
+                                This looks like rest time, but has energy debt<br>
+                                <strong>Day:</strong> ${dayNames[day]}<br>
+                                <strong>Recovery needed:</strong> ${(debtIntensity * 100).toFixed(0)}%<br>
+                                <em>Previous activities are still affecting you here</em>
+                            `;
+                        } else {
+                            document.getElementById('infoTitle').textContent = 'Low-Friction Zone';
+                            document.getElementById('infoContent').innerHTML = `
+                                Natural low-load area detected<br>
+                                <strong>Day:</strong> ${dayNames[day]}<br>
+                                <em>A good time for rest or light work</em>
+                            `;
+                        }
+                        
+                        document.getElementById('infoPanel').style.display = 'block';
+                    }
+                }
+            }
+        }
+
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', () => {
+            const loadMap = new WeeklyLoadMap();
+            
+            // Setup form handling
+            const activityForm = document.getElementById('activityForm');
+            const durationButtons = document.querySelectorAll('.duration-buttons .btn');
+            const loadButtons = document.querySelectorAll('.load-buttons .btn');
+            
+            // Duration button handling
+            durationButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    durationButtons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    document.getElementById('duration').value = btn.dataset.value;
+                });
+            });
+            
+            // Load button handling
+            loadButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    loadButtons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    document.getElementById('load').value = btn.dataset.value;
+                });
+            });
+            
+            // Form submission
+            activityForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                
+                const activity = {
+                    name: document.getElementById('activityName').value,
+                    duration: document.getElementById('duration').value,
+                    load: document.getElementById('load').value,
+                    day: parseInt(document.getElementById('day').value),
+                    position: Math.random()
+                };
+                
+                loadMap.addActivity(activity);
+                activityForm.reset();
+                
+                durationButtons[1].click();
+                loadButtons[1].click();
+            });
+            
+            // Theme toggle
+            const themeToggle = document.getElementById('themeToggle');
+            themeToggle.addEventListener('click', () => {
+                document.body.classList.toggle('dark-mode');
+                themeToggle.textContent = document.body.classList.contains('dark-mode') ? '☀️' : '🌙';
+                
+                if (loadMap.mode === 'plan') {
+                    loadMap.draw();
+                } else if (loadMap.mode === 'compare') {
+                    loadMap.drawComparison();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
